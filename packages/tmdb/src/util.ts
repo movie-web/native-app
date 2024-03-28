@@ -5,5 +5,5 @@ const TMDB_API_KEY =
 export const tmdb = new TMDB(TMDB_API_KEY);
 
 export function getMediaPoster(posterPath: string): string {
-  return `https://image.tmdb.org/t/p/w185/${posterPath}`;
+  return `https://image.tmdb.org/t/p/w500/${posterPath}`;
 }

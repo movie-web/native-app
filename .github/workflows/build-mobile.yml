@@ -7,8 +7,9 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
-jobs:   
+jobs:
   build-android:
     runs-on: ubuntu-latest
 
@@ -16,40 +17,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 21
-
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v3
         name: Install pnpm
         with:
           version: 8
           run_install: false
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v3
+      - name: Install Node.js
+        uses: actions/setup-node@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          node-version: 21
+          cache: "pnpm"
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Cache Node Modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build Android app
-        run: cd apps/expo && pnpm run apk
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Rename apk
-        run: cd apps/expo && mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/movie-web.apk
+      - name: Build Android app
+        run: cd apps/expo && pnpm apk
 
       - name: Upload movie-web.apk as artifact
         uses: actions/upload-artifact@v4
         with:
           name: apk
-          path: ./apps/expo/android/app/build/outputs/apk/release/movie-web.apk
+          path: ./apps/expo/android/app/build/movie-web.apk
 
   build-ios:
     runs-on: macos-14
@@ -61,32 +69,37 @@ jobs:
       - name: Xcode Select Version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.1.0'
+          xcode-version: "15.1.0"
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 21
-  
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v3
         name: Install pnpm
         with:
           version: 8
           run_install: false
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 21
+          cache: "pnpm"
+
+      - name: Cache Node Modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install dependencies
         run: pnpm install
 
+      - name: Cache Pods
+        uses: actions/cache@v4
+        with:
+          path: apps/expo/ios
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Build iOS app
-        run: cd apps/expo && pnpm run ipa
-          
-      - name: Export .ipa from .app
-        run: |
-          cd apps/expo
-          mkdir -p ios/build/Build/Products/Release-iphoneos/Payload
-          mv ios/build/Build/Products/Release-iphoneos/movieweb.app ios/build/Build/Products/Release-iphoneos/Payload/
-          cd ios/build/Build/Products/Release-iphoneos
-          zip -r ../../../movie-web.ipa Payload
+        run: cd apps/expo && pnpm ipa
 
       - name: Upload movie-web.ipa as artifact
         uses: actions/upload-artifact@v4

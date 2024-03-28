@@ -1,24 +1,40 @@
-import { View } from "react-native";
+import { Platform } from "react-native";
+import * as Haptics from "expo-haptics";
 import { Tabs } from "expo-router";
+import * as ScreenOrientation from "expo-screen-orientation";
+import { useTheme, View } from "tamagui";
 
-import Colors from "@movie-web/tailwind-config/colors";
-
+import { MovieWebSvg } from "~/components/Icon";
+import SvgTabBarIcon from "~/components/SvgTabBarIcon";
 import TabBarIcon from "~/components/TabBarIcon";
 
 export default function TabLayout() {
+  const theme = useTheme();
+
   return (
     <Tabs
       sceneContainerStyle={{
-        backgroundColor: Colors.background,
+        backgroundColor: theme.screenBackground.val,
       }}
+      screenListeners={() => ({
+        tabPress: () => {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        },
+        focus: () => {
+          void ScreenOrientation.lockAsync(
+            ScreenOrientation.OrientationLock.PORTRAIT_UP,
+          );
+        },
+      })}
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: Colors.primary[100],
+        tabBarActiveTintColor: theme.tabBarIconFocused.val,
         tabBarStyle: {
-          backgroundColor: Colors.secondary[700],
+          backgroundColor: theme.tabBarBackground.val,
           borderTopColor: "transparent",
           borderTopRightRadius: 20,
           borderTopLeftRadius: 20,
+          paddingBottom: Platform.select({ ios: 100 }),
           height: 80,
         },
         tabBarItemStyle: {
@@ -42,11 +58,11 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="about"
+        name="downloads"
         options={{
-          title: "About",
+          title: "Downloads",
           tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="info-circle" focused={focused} />
+            <TabBarIcon name="download" focused={focused} />
           ),
         }}
       />
@@ -55,10 +71,32 @@ export default function TabLayout() {
         options={{
           title: "Search",
           tabBarLabel: "",
-          tabBarIcon: () => (
-            <View className="android:top-2 ios:top-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary-400 text-center align-middle text-2xl text-white">
+          tabBarIcon: ({ focused }) => (
+            <View
+              top={2}
+              height={56}
+              width={56}
+              alignItems="center"
+              justifyContent="center"
+              overflow="hidden"
+              borderRadius={100}
+              backgroundColor={
+                focused ? theme.tabBarIconFocused : theme.tabBarIcon
+              }
+            >
               <TabBarIcon name="search" color="#FFF" />
             </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="movie-web"
+        options={{
+          title: "movie-web",
+          tabBarIcon: ({ focused }) => (
+            <SvgTabBarIcon focused={focused}>
+              <MovieWebSvg />
+            </SvgTabBarIcon>
           ),
         }}
       />
@@ -68,15 +106,6 @@ export default function TabLayout() {
           title: "Settings",
           tabBarIcon: ({ focused }) => (
             <TabBarIcon name="cog" focused={focused} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="account"
-        options={{
-          title: "Account",
-          tabBarIcon: ({ focused }) => (
-            <TabBarIcon name="user" focused={focused} />
           ),
         }}
       />

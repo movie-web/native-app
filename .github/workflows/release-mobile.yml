@@ -4,28 +4,30 @@ on:
   push:
     branches:
       - master
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   bump-version:
-      runs-on: ubuntu-latest
+    runs-on: ubuntu-latest
 
-      steps:
-        - name: Checkout code
-          uses: actions/checkout@v4
-          with:
-            fetch-depth: 0
-  
-        - name: Automated Version Bump
-          uses: phips28/gh-action-bump-version@v10.1.1
-          with:
-            skip-tag:  'true'
-            commit-message: 'chore: bump mobile version to {{version}} [skip ci]'
-          env:
-            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-            
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Automated Version Bump
+        uses: phips28/gh-action-bump-version@v11.0.0
+        with:
+          skip-tag: "true"
+          commit-message: "chore: bump mobile version to {{version}} [skip ci]"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PACKAGEJSON_DIR: "apps/expo"
+
   build-android:
     runs-on: ubuntu-latest
     needs: [bump-version]
@@ -34,40 +36,50 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Pull version bump
+        run: git pull --all
+
+      - uses: pnpm/action-setup@v3
+        name: Install pnpm
+        with:
+            version: 8
+            run_install: false
+
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 21
-
-      - uses: pnpm/action-setup@v2
-        name: Install pnpm
-        with:
-          version: 8
-          run_install: false
+          cache: "pnpm"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
-          java-version: '17'
-          distribution: 'temurin'
+          java-version: "17"
+          distribution: "temurin"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: Cache Node Modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build Android app
-        run: cd apps/expo && pnpm run apk
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
-      - name: Rename apk
-        run: cd apps/expo && mv android/app/build/outputs/apk/release/app-release.apk android/app/build/outputs/apk/release/movie-web.apk
+      - name: Build Android app
+        run: cd apps/expo && pnpm apk
 
       - name: Upload movie-web.apk as artifact
         uses: actions/upload-artifact@v4
         with:
           name: apk
-          path: ./apps/expo/android/app/build/outputs/apk/release/movie-web.apk
+          path: ./apps/expo/android/app/build/movie-web.apk
 
   build-ios:
     runs-on: macos-14
@@ -77,35 +89,43 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Pull version bump
+        run: git pull --all
+
       - name: Xcode Select Version
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.1.0'
+          xcode-version: "15.1.0"
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 21
-  
-      - uses: pnpm/action-setup@v2
+      - uses: pnpm/action-setup@v3
         name: Install pnpm
         with:
           version: 8
           run_install: false
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 21
+          cache: "pnpm"
+
+      - name: Cache Node Modules
+        uses: actions/cache@v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Install dependencies
         run: pnpm install
 
+      - name: Cache Pods
+        uses: actions/cache@v4
+        with:
+          path: apps/expo/ios
+          key: ${{ runner.os }}-pods-${{ hashFiles('**/pnpm-lock.yaml') }}
+
       - name: Build iOS app
-        run: cd apps/expo && pnpm run ipa
-          
-      - name: Export .ipa from .app
-        run: |
-          cd apps/expo
-          mkdir -p ios/build/Build/Products/Release-iphoneos/Payload
-          mv ios/build/Build/Products/Release-iphoneos/movieweb.app ios/build/Build/Products/Release-iphoneos/Payload/
-          cd ios/build/Build/Products/Release-iphoneos
-          zip -r ../../../movie-web.ipa Payload
+        run: cd apps/expo && pnpm ipa
 
       - name: Upload movie-web.ipa as artifact
         uses: actions/upload-artifact@v4
@@ -121,6 +141,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Pull version bump
+        run: git pull --all
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
@@ -129,15 +152,47 @@ jobs:
       - name: Get package version
         id: package-version
         uses: martinbeentjes/npm-get-version-action@v1.3.1
+        with:
+          path: apps/expo
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.package-version.outputs.current-version }}          
+          tag_name: v${{ steps.package-version.outputs.current-version }}
           files: |
             movie-web.apk
             movie-web.ipa
+          generate_release_notes: true
           fail_on_unmatched_files: true
           token: ${{ env.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  app-repo:
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    needs: [build-ios, release-app]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Pull version bump
+        run: git pull --all
+
+      - name: Download IPA artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ipa
+        
+      - name: Update app-repo.json
+        run: |
+          VERSION=$(jq -r '.version' apps/expo/package.json)
+          DATE=$(date -u +"%Y-%m-%d")
+          IPA_SIZE=$(ls -l movie-web.ipa | awk '{print $5}')
+          NEW_ENTRY=$(jq -n --arg version "$VERSION" --arg date "$DATE" --arg size "$IPA_SIZE" --arg downloadURL "https://github.com/movie-web/native-app/releases/download/v$VERSION/movie-web.ipa" '{version: $version, date: $date, size: ($size | tonumber), downloadURL: $downloadURL}')
+          jq --argjson newEntry "$NEW_ENTRY" '.apps[0].versions |= [$newEntry] + .' apps/expo/app-repo.json > temp.json && mv temp.json apps/expo/app-repo.json
+        
+      - uses: EndBug/add-and-commit@v9
+        with:
+          default_author: github_actions
+          message: "chore: update app-repo.json"

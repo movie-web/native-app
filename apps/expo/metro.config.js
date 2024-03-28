@@ -1,19 +1,19 @@
 // Learn more: https://docs.expo.dev/guides/monorepos/
 const { getDefaultConfig } = require("expo/metro-config");
 const { FileStore } = require("metro-cache");
-const { withNativeWind } = require("nativewind/metro");
+const { withTamagui } = require("@tamagui/metro-plugin");
 
 const path = require("path");
 
 module.exports = withTurborepoManagedCache(
   withMonorepoPaths(
-    withNativeWind(
+    withTamagui(
       getDefaultConfig(__dirname, {
         isCSSEnabled: true,
       }),
       {
-        input: "./src/app/styles/global.css",
-        configPath: "./tailwind.config.ts",
+        components: ["tamagui"],
+        config: "./tamagui.config.ts",
       },
     ),
   ),

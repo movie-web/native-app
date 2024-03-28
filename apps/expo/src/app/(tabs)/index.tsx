@@ -1,10 +1,23 @@
+import React from "react";
+import { View } from "tamagui";
+
+import { ItemListSection } from "~/components/item/ItemListSection";
 import ScreenLayout from "~/components/layout/ScreenLayout";
-import { Text } from "~/components/ui/Text";
+import { useBookmarkStore, useWatchHistoryStore } from "~/stores/settings";
 
 export default function HomeScreen() {
+  const { bookmarks } = useBookmarkStore();
+  const { watchHistory } = useWatchHistoryStore();
+
   return (
-    <ScreenLayout title="Home" subtitle="This is where all magic happens">
-      <Text>Movies will be listed here</Text>
-    </ScreenLayout>
+    <View style={{ flex: 1 }} flex={1}>
+      <ScreenLayout>
+        <ItemListSection title="Bookmarks" items={bookmarks} />
+        <ItemListSection
+          title="Continue Watching"
+          items={watchHistory.map((x) => x.item)}
+        />
+      </ScreenLayout>
+    </View>
   );
 }

@@ -2,15 +2,22 @@
   "extends": ["@movie-web/tsconfig/base.json"],
   "compilerOptions": {
     "incremental": true,
+    "allowJs": true,
     "baseUrl": ".",
     "paths": {
       "~/*": ["./src/*"],
-      "~/components/*": ["./src/app/components/*"],
+      "~/components/*": ["./src/components/*"],
     },
     "jsx": "react-native",
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
-    "types": ["nativewind/types"],
   },
-  "include": ["src", "*.ts", "*.js", ".expo/types/**/*.ts", "expo-env.d.ts"],
+  "include": [
+    "src",
+    "*.ts",
+    "*.js",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts",
+    "src/plugins/*",
+  ],
   "exclude": ["node_modules"],
 }

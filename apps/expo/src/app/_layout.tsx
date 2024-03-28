@@ -1,23 +1,29 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { useEffect } from "react";
-import { useColorScheme } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+// @ts-expect-error - No exported types
+import { ModalView } from "react-native-ios-modal";
 import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
 import FontAwesome from "@expo/vector-icons/FontAwesome";
-import {
-  DarkTheme,
-  DefaultTheme,
-  ThemeProvider,
-} from "@react-navigation/native";
+import { DarkTheme, ThemeProvider } from "@react-navigation/native";
+import { setupNativeSheet } from "@tamagui/sheet";
+import { ToastProvider, ToastViewport } from "@tamagui/toast";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { TamaguiProvider, Theme, useTheme } from "tamagui";
+import tamaguiConfig from "tamagui.config";
 
-import Colors from "@movie-web/tailwind-config/colors";
-
-import "./styles/global.css";
+import { DownloadManagerProvider } from "~/hooks/DownloadManagerContext";
+import { useThemeStore } from "~/stores/theme";
+// @ts-expect-error - Without named import it causes an infinite loop
+import _styles from "../../tamagui-web.css";
 
 export {
   // Catch any errors thrown by the Layout component.
   ErrorBoundary,
 } from "expo-router";
+
+setupNativeSheet("ios", ModalView);
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
@@ -28,6 +34,8 @@ export const unstable_settings = {
 SplashScreen.preventAutoHideAsync().catch(() => {
   /* reloading the app might trigger this, so it's safe to ignore */
 });
+
+const queryClient = new QueryClient();
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -57,25 +65,62 @@ export default function RootLayout() {
     return null;
   }
 
-  return <RootLayoutNav />;
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <RootLayoutNav />
+    </GestureHandlerRootView>
+  );
+}
+
+function ScreenStacks() {
+  const theme = useTheme();
+
+  return (
+    <Stack
+      screenOptions={{
+        autoHideHomeIndicator: true,
+        gestureEnabled: true,
+        animation: "default",
+        animationTypeForReplace: "push",
+        presentation: "card",
+        headerShown: false,
+        contentStyle: {
+          backgroundColor: theme.screenBackground.val,
+        },
+      }}
+    >
+      <Stack.Screen
+        name="(tabs)"
+        options={{
+          headerShown: false,
+          autoHideHomeIndicator: true,
+          gestureEnabled: true,
+          animation: "default",
+          animationTypeForReplace: "push",
+          presentation: "card",
+        }}
+      />
+    </Stack>
+  );
 }
 
 function RootLayoutNav() {
-  const colorScheme = useColorScheme();
+  const themeStore = useThemeStore((s) => s.theme);
 
   return (
-    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <Stack
-        screenOptions={{
-          gestureEnabled: true,
-          headerShown: false,
-          contentStyle: {
-            backgroundColor: Colors.background,
-          },
-        }}
-      >
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      </Stack>
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <TamaguiProvider config={tamaguiConfig} defaultTheme="main">
+        <ToastProvider>
+          <DownloadManagerProvider>
+            <ThemeProvider value={DarkTheme}>
+              <Theme name={themeStore}>
+                <ScreenStacks />
+              </Theme>
+            </ThemeProvider>
+          </DownloadManagerProvider>
+          <ToastViewport />
+        </ToastProvider>
+      </TamaguiProvider>
+    </QueryClientProvider>
   );
 }
